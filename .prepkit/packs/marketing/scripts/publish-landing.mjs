@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 // publish-landing.mjs — deterministic engine that takes a built landing page from
-// assets/landing/<slug>/ and publishes it to the Cloudflare Pages publish repo.
+// assets/landing/<slug>/ and publishes it live via the Cloudflare Workers (Static Assets) publish repo.
 //
-// Flow (matches the approved plan):
+// Flow (direct-to-live, claims-gated):
 //   1. Run the EXISTING claims gate (claims-check.sh --mode publish) — abort on FAIL.
 //   2. Sync a local working clone of the publish repo (clone or fetch).
 //   3. Export the page folder (HTML + policy pages + images) into <locale>/<slug>/,
-//      write publish-meta.json (provenance the CI gate checks), drop internal-only files.
-//   4. Default: push a campaign/<locale>-<slug> branch -> Cloudflare builds a PREVIEW.
-//      --promote: merge that branch into the production branch -> Cloudflare deploys LIVE.
+//      write publish-meta.json (provenance the CI gate checks), drop internal-only files (copy.md/.md).
+//   4. Commit + push the production branch -> Cloudflare deploys it LIVE at <subdomain>/<locale>/<slug>/.
+//   --init scaffolds an empty publish repo (wrangler.jsonc, .assetsignore, CI gate, apex index).
 //
 // The skill/command drives this; the marketer never sees git or Cloudflare.
 // Config comes from context/marketing.config.json -> publish{} (never hardcoded).
 //
 // Usage:
-//   node publish-landing.mjs --slug <slug> [--locale vi] [--promote] [--page-dir <path>] [--dry-run] [--json]
+//   node publish-landing.mjs --slug <slug> [--locale vi] [--page-dir <path>] [--dry-run] [--json]
+//   node publish-landing.mjs --init    (one-time: scaffold + push the publish repo)
 //   Exit 0 = OK, 1 = gate/operation failed, 2 = usage/config error.
 
 import fs from "node:fs";
@@ -29,7 +30,7 @@ const ROOT = process.env.PREP_KIT_ROOT
 
 // ---- args -----------------------------------------------------------------
 function parseArgs(argv) {
-  const a = { promote: false, dryRun: false, json: false };
+  const a = { dryRun: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
     if (t === "--slug") a.slug = argv[++i];

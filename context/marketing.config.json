@@ -10,7 +10,7 @@
     "_publishGate_values": "off = no claims gate on publish-ready writes | warn = flag but allow (advisory default) | deny = block publish-ready writes with unverified claims (opt-in strict, fail-closed)"
   },
   "publish": {
-    "_note": "How approved landing pages go live (read by /mkt-publish + publish-landing.mjs). After the one-time Phase-0 setup, set repo.remote to your real publish repo. Cloudflare Pages serves it at https://<subdomain>/<localeSegment>/<slug>/. localeSegment defaults to the primaryLocale language subtag (vi) when omitted.",
+    "_note": "How approved landing pages go live (read by /mkt-publish + publish-landing.mjs). After the one-time Phase-0 setup, set repo.remote to your real publish repo. Cloudflare (Workers Static Assets) serves it at https://<subdomain>/<localeSegment>/<slug>/. localeSegment defaults to the primaryLocale language subtag (vi) when omitted.",
     "provider": "cloudflare-workers-assets",
     "subdomain": "lp.prepedu.com",
     "projectName": "prepedu-landing",

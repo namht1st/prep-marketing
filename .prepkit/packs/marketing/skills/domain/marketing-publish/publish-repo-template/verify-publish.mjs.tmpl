@@ -4,12 +4,12 @@
 //   - has a publish-meta.json written by the kit with gate.passed === true
 //   - every claim it used is approved and not past its expiry
 //   - no template placeholders ({{…}}) or untransformed claim tags ([[CLM-…]]) leaked into the HTML
-// No external dependencies. Exit 1 on any failure. (Managed by the PrepEdu Marketing Kit — do not hand-edit.)
+// No external dependencies. Exit 1 on any failure. (Managed by the marketing kit — do not hand-edit.)
 import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
-const SKIP = new Set([".git", ".github", "node_modules"]);
+const SKIP = new Set([".git", ".github", ".wrangler", "node_modules"]);
 const today = new Date().toISOString().slice(0, 10);
 const fails = [];
 

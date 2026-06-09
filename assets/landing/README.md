@@ -8,6 +8,6 @@
       <images>
       copy.md                   (claim-tagged source copy)
 
-`/mkt-publish` then takes an approved page live on Cloudflare Pages. Generated images are git-ignored here;
+`/mkt-publish` then takes an approved page live on Cloudflare (Workers Static Assets). Generated images are git-ignored here;
 the publish step copies them into the publish repo. See the runbook:
 `.prepkit/docs/guides/landing-page-publishing.md`.
