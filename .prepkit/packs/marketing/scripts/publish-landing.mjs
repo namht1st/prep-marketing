@@ -157,6 +157,15 @@ function seedTemplateIfMissing(co, cfg, force = false) {
   return seeded;
 }
 
+// Large image-bearing pushes fail over HTTP/2 ("RPC failed; HTTP 400 / send-pack disconnect");
+// force HTTP/1.1 + a big post buffer on the checkout so pushes that include assets succeed.
+function ensureGitConfig(co) {
+  try {
+    git(co, "config", "http.version", "HTTP/1.1");
+    git(co, "config", "http.postBuffer", "524288000");
+  } catch {}
+}
+
 // ---- init (one-time: scaffold + push the publish repo) --------------------
 function initRepo(cfg, a) {
   const co = cfg.checkout;
@@ -165,6 +174,7 @@ function initRepo(cfg, a) {
     try { run("git", ["clone", cfg.remote, co]); }
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Create it on GitHub + check push access.\n${e.stderr || e.message}`); }
   }
+  ensureGitConfig(co);
   try { git(co, "fetch", "--prune", "origin"); } catch {}
   try { git(co, "checkout", "-B", cfg.productionBranch, `origin/${cfg.productionBranch}`); }
   catch { git(co, "checkout", "-B", cfg.productionBranch); }
@@ -231,6 +241,7 @@ function main() {
     try { run("git", ["clone", cfg.remote, co]); }
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Check Phase-0 setup + push access.\n${e.stderr || e.message}`); }
   }
+  ensureGitConfig(co);
   try { git(co, "fetch", "--prune", "origin"); }
   catch (e) { die(1, `git fetch failed in ${co}\n${e.stderr || e.message}`); }
 
