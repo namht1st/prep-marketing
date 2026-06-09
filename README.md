@@ -17,6 +17,33 @@ cd prep-marketing
 you're ready. Open the folder in **[Claude Code](https://claude.com/claude-code)** and type **`/mkt-setup`**.
 Full details (and the manual steps it runs for you) are in **[Install & Setup](.prepkit/docs/guides/installation.md)**.
 
+<details>
+<summary>🆕 <b>First time, or on a brand-new computer?</b> Click here — no technical background needed.</summary>
+
+You need three things installed first. Do them in order — each is a normal click-through installer:
+
+1. **Claude Code** — the app you'll actually work in. Get it from
+   [claude.com/claude-code](https://claude.com/claude-code) and **sign in**. It needs a paid Claude
+   plan (Pro or Max) or API billing — if you hit a login/paywall screen, that's expected, not a bug.
+2. **Node.js** — what the kit runs on. Download the **LTS** version from
+   [nodejs.org](https://nodejs.org) and open the file to install it.
+3. **Open the Terminal** — on a Mac, press `Cmd`+`Space`, type `Terminal`, press `Enter`. A plain
+   text window opens; that's where the commands go.
+
+Then copy the three lines from **Install** above into the Terminal, **one at a time** (paste a line,
+press `Enter`, wait for it to finish, then do the next).
+
+- The first line (`git clone …`) may pop up a Mac dialog asking to install *"command line developer
+  tools."* Click **Install**, wait a few minutes, then run that same line again. This is normal and
+  happens only once.
+- `./install.sh` is **safe to re-run** — if anything looks off, just run it again.
+- When it prints **"You're ready."**, open the `prep-marketing` folder in Claude Code and type
+  **`/mkt-setup`**.
+
+*On Windows?* Install [Git for Windows](https://git-scm.com/download/win) first, then run the three
+commands in the **Git Bash** window it gives you — everything else is identical.
+</details>
+
 ## Start here
 > 📖 **Guides:** **[Install & Setup](.prepkit/docs/guides/installation.md)** (get running) · **[Team User Guide](.prepkit/docs/guides/marketing-user-guide.md)** (why the kit, daily tasks, big campaigns, automation — in plain language).
 
