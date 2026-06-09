@@ -40,6 +40,10 @@ When it finishes, run `claude` to sign in (paid Pro/Max plan), then type `/mkt-s
 can't automate is that interactive sign-in. It's safe to re-run and never overwrites an existing
 `context/`. The kit lands in `~/prep-marketing` (override with `PREP_DIR=/path`).
 
+> **Windows:** this one-liner is macOS/Linux only. Install Claude Code (`winget install
+> Anthropic.ClaudeCode`) and Node.js ([nodejs.org](https://nodejs.org)), then use **The fast path**
+> below inside **Git Bash** (from [Git for Windows](https://git-scm.com/download/win)).
+
 ## The fast path (if you already have the tools)
 
 ```bash

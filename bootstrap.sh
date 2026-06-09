@@ -43,7 +43,7 @@ have curl || die "curl is required but not found. (It ships with macOS; on Linux
 case "$(uname -s)" in
   Darwin) PLAT_OS="darwin" ;;
   Linux)  PLAT_OS="linux" ;;
-  *) die "This bootstrap supports macOS and Linux. On Windows, install Git for Windows and run it in Git Bash — see the README." ;;
+  *) die "This one-line installer supports macOS and Linux only. On Windows, install Claude Code (winget install Anthropic.ClaudeCode) and Node.js (nodejs.org), then use the clone + ./install.sh path in Git Bash — see the README." ;;
 esac
 case "$(uname -m)" in
   arm64|aarch64) PLAT_ARCH="arm64" ;;

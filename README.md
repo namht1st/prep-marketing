@@ -44,8 +44,10 @@ admin password, and it doesn't even need `git`).
 
 It's safe to re-run if anything looks off, and it never overwrites your brand data.
 
-*On Windows?* Install [Git for Windows](https://git-scm.com/download/win) and run the same one-line
-command in the **Git Bash** window it provides.
+*On Windows?* The one-line installer is macOS/Linux only. Install **Claude Code** (`winget install
+Anthropic.ClaudeCode`, or [claude.com/claude-code](https://claude.com/claude-code)) and **Node.js**
+from [nodejs.org](https://nodejs.org), then run the **clone + `./install.sh`** steps above inside
+**Git Bash** (from [Git for Windows](https://git-scm.com/download/win)).
 </details>
 
 ## Start here
