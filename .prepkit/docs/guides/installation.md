@@ -26,7 +26,21 @@ library only.
 
 ---
 
-## The fast path (recommended)
+## One line from a blank machine (easiest)
+
+On a fresh Mac or Linux box with nothing installed, this single command installs Claude Code, Node.js,
+**and** the kit — no prerequisites, no admin password (Node goes in `~/.local`; the kit is fetched as a
+tarball, so even `git` isn't required):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+```
+
+When it finishes, run `claude` to sign in (paid Pro/Max plan), then type `/mkt-setup`. The only step it
+can't automate is that interactive sign-in. It's safe to re-run and never overwrites an existing
+`context/`. The kit lands in `~/prep-marketing` (override with `PREP_DIR=/path`).
+
+## The fast path (if you already have the tools)
 
 ```bash
 git clone https://github.com/namht1st/prep-marketing.git

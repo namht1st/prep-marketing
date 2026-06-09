@@ -7,41 +7,45 @@ work, checks every claim, and asks for your approval before anything is "publish
 
 ## Install (one command)
 
+**Brand-new computer, nothing installed yet?** This one line installs Claude Code, Node.js, **and** the
+kit — no tools required first, no admin password:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+```
+
+When it finishes, sign in to Claude Code (run `claude` — needs a paid Pro/Max plan) and type
+**`/mkt-setup`**. That's the whole setup.
+
+**Already have git, Node.js, and Claude Code?** Clone and build directly instead:
+
 ```bash
 git clone https://github.com/namht1st/prep-marketing.git
 cd prep-marketing
 ./install.sh
 ```
 
-`install.sh` checks your tools, builds the kit's local files, and verifies everything — then tells you
-you're ready. Open the folder in **[Claude Code](https://claude.com/claude-code)** and type **`/mkt-setup`**.
-Full details (and the manual steps it runs for you) are in **[Install & Setup](.prepkit/docs/guides/installation.md)**.
+Either way, the build checks your tools, generates the kit's local files, and verifies everything.
+Full details are in **[Install & Setup](.prepkit/docs/guides/installation.md)**.
 
 <details>
-<summary>🆕 <b>First time, or on a brand-new computer?</b> Click here — no technical background needed.</summary>
+<summary>🆕 <b>First time, or not sure where to start?</b> Click here — no technical background needed.</summary>
 
-You need three things installed first. Do them in order — each is a normal click-through installer:
+On a Mac you don't need to install anything first — the **one-line command** above does it all (no
+admin password, and it doesn't even need `git`).
 
-1. **Claude Code** — the app you'll actually work in. Get it from
-   [claude.com/claude-code](https://claude.com/claude-code) and **sign in**. It needs a paid Claude
-   plan (Pro or Max) or API billing — if you hit a login/paywall screen, that's expected, not a bug.
-2. **Node.js** — what the kit runs on. Download the **LTS** version from
-   [nodejs.org](https://nodejs.org) and open the file to install it.
-3. **Open the Terminal** — on a Mac, press `Cmd`+`Space`, type `Terminal`, press `Enter`. A plain
-   text window opens; that's where the commands go.
+1. **Open the Terminal** — press `Cmd`+`Space`, type `Terminal`, press `Enter`. A plain text window
+   opens; that's where the command goes.
+2. **Paste the one-line command** from **Install** above, then press `Enter`. It downloads and sets up
+   Claude Code, Node.js, and the kit (a few minutes).
+3. When it says **"Almost there"**, sign in to Claude Code: type `claude`, press `Enter` — it opens
+   your browser to log in. *This needs a paid Claude plan (Pro or Max);* a free account won't work.
+4. Type **`/mkt-setup`** and follow the questions.
 
-Then copy the three lines from **Install** above into the Terminal, **one at a time** (paste a line,
-press `Enter`, wait for it to finish, then do the next).
+It's safe to re-run if anything looks off, and it never overwrites your brand data.
 
-- The first line (`git clone …`) may pop up a Mac dialog asking to install *"command line developer
-  tools."* Click **Install**, wait a few minutes, then run that same line again. This is normal and
-  happens only once.
-- `./install.sh` is **safe to re-run** — if anything looks off, just run it again.
-- When it prints **"You're ready."**, open the `prep-marketing` folder in Claude Code and type
-  **`/mkt-setup`**.
-
-*On Windows?* Install [Git for Windows](https://git-scm.com/download/win) first, then run the three
-commands in the **Git Bash** window it gives you — everything else is identical.
+*On Windows?* Install [Git for Windows](https://git-scm.com/download/win) and run the same one-line
+command in the **Git Bash** window it provides.
 </details>
 
 ## Start here

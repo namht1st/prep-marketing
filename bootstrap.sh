@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+#
+# PrepEdu Marketing Kit — one-command bootstrap (from a blank machine).
+#
+#   curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+#
+# Installs everything a fresh Mac/Linux machine needs — Claude Code, Node.js, and the
+# kit itself — without you installing anything first. No admin password on the common
+# path (Node goes into ~/.local; the kit is fetched as a tarball, so git isn't needed).
+#
+# The ONE thing it can't do for you: sign in to Claude Code. That's an interactive
+# browser login and needs a paid Claude plan (Pro/Max) — the script ends by telling
+# you exactly how.
+#
+# Safe to re-run. It never re-downloads over an existing kit (your context/ is kept).
+
+set -u
+
+REPO_SLUG="namht1st/prep-marketing"
+REPO_BRANCH="${PREP_BRANCH:-main}"
+INSTALL_DIR="${PREP_DIR:-$HOME/prep-marketing}"
+NODE_VERSION="${NODE_VERSION:-v22.11.0}"   # LTS; override with NODE_VERSION=v20.x if needed
+LOCAL_PREFIX="$HOME/.local"
+
+# --- tiny, TTY-safe formatting (matches install.sh) ---------------------------
+if [ -t 1 ] && command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
+  BOLD="$(tput bold)"; DIM="$(tput dim)"; GREEN="$(tput setaf 2)"; YELLOW="$(tput setaf 3)"; RED="$(tput setaf 1)"; RESET="$(tput sgr0)"
+else
+  BOLD=""; DIM=""; GREEN=""; YELLOW=""; RED=""; RESET=""
+fi
+say()  { printf '%s\n' "$*"; }
+step() { printf '\n%s==>%s %s%s%s\n' "$BOLD" "$RESET" "$BOLD" "$*" "$RESET"; }
+ok()   { printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$*"; }
+warn() { printf '  %s!%s %s\n' "$YELLOW" "$RESET" "$*"; }
+die()  { printf '\n  %s✗ %s%s\n\n' "$RED" "$*" "$RESET" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+say "${BOLD}PrepEdu Marketing Kit — bootstrap${RESET}"
+say "${DIM}Installs Claude Code, Node.js, and the kit. The only step left for you afterward is signing in to Claude Code.${RESET}"
+
+# --- 0. Platform + curl --------------------------------------------------------
+have curl || die "curl is required but not found. (It ships with macOS; on Linux: apt/dnf install curl.)"
+case "$(uname -s)" in
+  Darwin) PLAT_OS="darwin" ;;
+  Linux)  PLAT_OS="linux" ;;
+  *) die "This bootstrap supports macOS and Linux. On Windows, install Git for Windows and run it in Git Bash — see the README." ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) PLAT_ARCH="arm64" ;;
+  x86_64|amd64)  PLAT_ARCH="x64" ;;
+  *) die "Unsupported CPU architecture '$(uname -m)'." ;;
+esac
+
+# Put ~/.local/bin on PATH for this run and persist it for future shells.
+ensure_local_path() {
+  case ":$PATH:" in *":$LOCAL_PREFIX/bin:"*) ;; *) PATH="$LOCAL_PREFIX/bin:$PATH"; export PATH ;; esac
+  for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
+    [ -f "$rc" ] || continue
+    grep -qs '\.local/bin' "$rc" && continue
+    printf '\n# Added by PrepEdu Marketing Kit bootstrap\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
+  done
+}
+
+node_ok() { have node && [ "$(node -v 2>/dev/null | sed 's/^v//; s/\..*$//')" -ge 18 ] 2>/dev/null; }
+
+# --- 1. Node.js (the kit's scripts run on it) ----------------------------------
+step "Node.js (the kit's scripts run on it)"
+if node_ok; then
+  ok "Node $(node -v) already installed"
+elif have brew; then
+  brew install node >/dev/null 2>&1 && ok "Installed Node via Homebrew ($(node -v))" || die "Homebrew node install failed. Install Node 18+ from https://nodejs.org and re-run."
+else
+  tarball="node-${NODE_VERSION}-${PLAT_OS}-${PLAT_ARCH}.tar.gz"
+  url="https://nodejs.org/dist/${NODE_VERSION}/${tarball}"
+  say "  ${DIM}downloading ${url}${RESET}"
+  tmp="$(mktemp -d)"
+  curl -fsSL "$url" | tar -xz -C "$tmp" || die "Could not download Node from $url . Set NODE_VERSION to a current LTS and re-run, or install from https://nodejs.org"
+  ndir="$(find "$tmp" -maxdepth 1 -type d -name 'node-*' | head -1)"
+  [ -n "$ndir" ] || die "Node archive looked empty after extract."
+  dest="$LOCAL_PREFIX/share/prepedu-kit/node-${NODE_VERSION}-${PLAT_OS}-${PLAT_ARCH}"
+  mkdir -p "$dest" "$LOCAL_PREFIX/bin"
+  cp -R "$ndir/." "$dest/"
+  ln -sf "$dest/bin/node" "$LOCAL_PREFIX/bin/node"
+  ln -sf "$dest/bin/npm"  "$LOCAL_PREFIX/bin/npm"
+  ln -sf "$dest/bin/npx"  "$LOCAL_PREFIX/bin/npx"
+  rm -rf "$tmp"
+  ensure_local_path
+  node_ok && ok "Installed Node $(node -v) to ~/.local (no admin needed)" || die "Node installed but not runnable — open a new terminal and re-run."
+fi
+
+# --- 2. Claude Code (the app you work in) --------------------------------------
+step "Claude Code (the app you'll work in)"
+if have claude; then
+  ok "Claude Code already installed ($(claude --version 2>/dev/null | head -1))"
+else
+  say "  ${DIM}running the official installer (claude.ai/install.sh)${RESET}"
+  curl -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 || warn "Claude Code installer reported an issue."
+  ensure_local_path
+  if have claude; then ok "Installed Claude Code ($(claude --version 2>/dev/null | head -1))"
+  else warn "Claude Code isn't on PATH yet — install it from https://claude.com/claude-code, then re-run."; fi
+fi
+
+# --- 3. Fetch the kit (tarball — no git required) ------------------------------
+step "The kit itself"
+if [ -d "$INSTALL_DIR/.prepkit" ]; then
+  ok "Kit already at $INSTALL_DIR — keeping your context/ and just rebuilding"
+else
+  url="https://codeload.github.com/${REPO_SLUG}/tar.gz/refs/heads/${REPO_BRANCH}"
+  say "  ${DIM}downloading ${url}${RESET}"
+  tmp="$(mktemp -d)"
+  curl -fsSL "$url" | tar -xz -C "$tmp" || die "Could not download the kit from $url"
+  src="$(find "$tmp" -maxdepth 1 -type d -name "*-${REPO_BRANCH}" | head -1)"
+  [ -n "$src" ] || die "Kit archive looked empty after extract."
+  mkdir -p "$INSTALL_DIR"
+  cp -R "$src/." "$INSTALL_DIR/"
+  rm -rf "$tmp"
+  ok "Downloaded the kit to $INSTALL_DIR"
+fi
+
+# --- 4. Build the kit (reuses the repo's install.sh) ---------------------------
+step "Building the kit"
+[ -f "$INSTALL_DIR/install.sh" ] || die "install.sh not found in $INSTALL_DIR — the download may be incomplete; re-run."
+( cd "$INSTALL_DIR" && bash ./install.sh ) || die "Kit build failed. Re-run this command; if it persists, send the output above to your kit maintainer."
+
+# --- Done ----------------------------------------------------------------------
+say ""
+say "${GREEN}${BOLD}Almost there — one human step left.${RESET}"
+say ""
+say "  ${BOLD}1. Sign in to Claude Code${RESET}  ${DIM}(needs a paid Claude plan — Pro or Max)${RESET}"
+say "       claude            ${DIM}# run this once; it opens your browser to log in${RESET}"
+say ""
+say "  ${BOLD}2. Start the kit${RESET}"
+say "       cd $INSTALL_DIR"
+say "       claude            ${DIM}# then type /mkt-setup${RESET}"
+say ""
+say "  ${DIM}No git? Fine — the kit works without it. Install git later only if you want one-command team updates.${RESET}"
+say ""
