@@ -11,7 +11,7 @@ work, checks every claim, and asks for your approval before anything is "publish
 kit — no tools required first, no admin password:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/prepforeverything/prep-marketing/main/bootstrap.sh | bash
 ```
 
 When it finishes, sign in to Claude Code (run `claude` — needs a paid Pro/Max plan) and type
@@ -20,7 +20,7 @@ When it finishes, sign in to Claude Code (run `claude` — needs a paid Pro/Max 
 **Already have git, Node.js, and Claude Code?** Clone and build directly instead:
 
 ```bash
-git clone https://github.com/namht1st/prep-marketing.git
+git clone https://github.com/prepforeverything/prep-marketing.git
 cd prep-marketing
 ./install.sh
 ```

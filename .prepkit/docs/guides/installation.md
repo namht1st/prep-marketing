@@ -33,7 +33,7 @@ On a fresh Mac or Linux box with nothing installed, this single command installs
 tarball, so even `git` isn't required):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/prepforeverything/prep-marketing/main/bootstrap.sh | bash
 ```
 
 When it finishes, run `claude` to sign in (paid Pro/Max plan), then type `/mkt-setup`. The only step it
@@ -47,7 +47,7 @@ can't automate is that interactive sign-in. It's safe to re-run and never overwr
 ## The fast path (if you already have the tools)
 
 ```bash
-git clone https://github.com/namht1st/prep-marketing.git
+git clone https://github.com/prepforeverything/prep-marketing.git
 cd prep-marketing
 ./install.sh
 ```

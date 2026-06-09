@@ -16,7 +16,7 @@
     "projectName": "prepedu-landing",
     "localeSegment": "vi",
     "repo": {
-      "remote": "https://github.com/namht1st/prepedu-landing.git",
+      "remote": "https://github.com/prepforeverything/prepedu-landing.git",
       "productionBranch": "main",
       "localCheckout": ".prepkit/.publish-cache/prepedu-landing"
     }
