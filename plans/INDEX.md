@@ -23,7 +23,7 @@ Path: `plans/active`
 
 Only current initiatives belong here. One directory per live initiative.
 
-- `260610-1124-kit-optimization-reliability-hygiene-bizloop/`
+- none
 
 ## Archive
 

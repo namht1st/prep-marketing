@@ -3,6 +3,9 @@
 // assets/landing/<slug>/ and publishes it live via the Cloudflare Workers (Static Assets) publish repo.
 //
 // Flow (direct-to-live, claims-gated):
+//   0. --preflight: claims gate + publish-repo access probe (git ls-remote, no clone, no writes) —
+//      the skill runs this BEFORE asking the human "đăng đi?", so the kit never promises a publish
+//      it cannot deliver (gate fail OR a machine without repo credentials/permission).
 //   1. Run the EXISTING claims gate (claims-check.sh --mode publish) — abort on FAIL.
 //   2. Sync a local working clone of the publish repo (clone or fetch).
 //   3. Export the page folder (HTML + policy pages + images) into <locale>/<slug>/,
@@ -14,7 +17,8 @@
 // Config comes from context/marketing.config.json -> publish{} (never hardcoded).
 //
 // Usage:
-//   node publish-landing.mjs --slug <slug> [--locale vi] [--page-dir <path>] [--dry-run] [--json]
+//   node publish-landing.mjs --slug <slug> [--locale vi] [--market VN] [--page-dir <path>]
+//                            [--preflight] [--dry-run] [--json]
 //   node publish-landing.mjs --init    (one-time: scaffold + push the publish repo)
 //   Exit 0 = OK, 1 = gate/operation failed, 2 = usage/config error.
 
@@ -35,7 +39,9 @@ function parseArgs(argv) {
     const t = argv[i];
     if (t === "--slug") a.slug = argv[++i];
     else if (t === "--locale") a.locale = argv[++i];
+    else if (t === "--market") a.market = argv[++i];
     else if (t === "--page-dir") a.pageDir = argv[++i];
+    else if (t === "--preflight") a.preflight = true;
     else if (t === "--dry-run") a.dryRun = true;
     else if (t === "--init") a.init = true;
     else if (t === "--json") a.json = true;
@@ -49,15 +55,52 @@ function die(code, msg) {
   process.exit(code);
 }
 
-// run a command, return stdout; throw with captured output on failure
+// run a command, return stdout; throw with captured output on failure.
+// GIT_TERMINAL_PROMPT=0 everywhere: on a machine without credentials git must FAIL FAST with a clear
+// error, never hang waiting for a username on a prompt nobody can see (callers may still override).
 function run(cmd, cmdArgs, opts = {}) {
+  const { env: optEnv, ...rest } = opts;
   return execFileSync(cmd, cmdArgs, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    ...opts,
+    ...rest,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...(optEnv || {}) },
   });
 }
 const git = (cwd, ...g) => run("git", ["-C", cwd, ...g]).trim();
+
+// Access probe for the publish repo — NO clone, no writes.
+// 1. `git ls-remote` proves the machine has credentials + at least READ access.
+// 2. For GitHub remotes, if `gh` is available, additionally verify PUSH permission — a collaborator
+//    added with the default "Read" role passes ls-remote but would die at the final push (real case:
+//    2 of 6 teammates, 2026-06-10). Fail-OPEN on any gh problem (missing, unauthed, API hiccup):
+//    only a definitive `push: false` blocks, mirroring the kit's gate safety model.
+function checkRemoteAccess(remote) {
+  try {
+    run("git", ["ls-remote", "--heads", remote], { timeout: 30000 });
+  } catch (e) {
+    return { ok: false, detail: `${e.stderr || e.message || e}`.trim().slice(0, 500) };
+  }
+  const gh = remote.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
+  if (gh) {
+    // Assumes gh is signed in as the same account git pushes with (true on teammate machines —
+    // gh IS the credential helper). A mismatched gh account could mis-report; accepted as exotic.
+    try {
+      const push = run("gh", ["api", `repos/${gh[1]}`, "--jq", ".permissions.push"], { timeout: 15000 }).trim();
+      if (push === "false") {
+        return { ok: false, detail: `this account has READ-ONLY access to ${gh[1]} — it can see the repo but cannot publish. Ask the maintainer to change the role to "Write".` };
+      }
+    } catch { /* gh missing/unauthed ⇒ read access stays the best available signal; push still dies loudly */ }
+  }
+  return { ok: true };
+}
+
+// Fresh teammate machines often have gh credentials but no git identity — `git commit` would die with
+// "Please tell me who you are". Fall back to a kit identity ONLY when the checkout has none configured.
+function commitIdFlags(co) {
+  try { if (git(co, "config", "user.email")) return []; } catch { /* unset → exit 1 → fall through */ }
+  return ["-c", "user.name=PrepKit Publisher", "-c", "user.email=publish@prepkit.local"];
+}
 
 // ---- config ---------------------------------------------------------------
 function loadConfig() {
@@ -167,6 +210,17 @@ function ensureGitConfig(co) {
   } catch {}
 }
 
+// The cached checkout outlives config changes (real case: the namht1st → prepforeverything org
+// move). Re-point origin whenever it drifts so pages always push to the CURRENT publish repo —
+// never wherever a stale cache happened to be cloned from.
+function ensureOrigin(co, remote) {
+  try {
+    if (git(co, "remote", "get-url", "origin") !== remote) git(co, "remote", "set-url", "origin", remote);
+  } catch {
+    try { git(co, "remote", "add", "origin", remote); } catch { /* sync will fail loudly */ }
+  }
+}
+
 // ---- init (one-time: scaffold + push the publish repo) --------------------
 function initRepo(cfg, a) {
   const co = cfg.checkout;
@@ -176,12 +230,13 @@ function initRepo(cfg, a) {
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Create it on GitHub + check push access.\n${e.stderr || e.message}`); }
   }
   ensureGitConfig(co);
+  ensureOrigin(co, cfg.remote);
   try { git(co, "fetch", "--prune", "origin"); } catch {}
   try { git(co, "checkout", "-B", cfg.productionBranch, `origin/${cfg.productionBranch}`); }
   catch { git(co, "checkout", "-B", cfg.productionBranch); }
   const seeded = seedTemplateIfMissing(co, cfg, true);
   git(co, "add", "-A");
-  try { git(co, "commit", "-m", "chore: initialize publish repo (Cloudflare static assets + CI gate)"); }
+  try { git(co, ...commitIdFlags(co), "commit", "-m", "chore: initialize publish repo (Cloudflare static assets + CI gate)"); }
   catch { /* nothing to commit — already initialized */ }
   try { git(co, "push", "-u", "origin", cfg.productionBranch); }
   catch (e) { die(1, `push failed to ${cfg.remote} — check your git push access.\n${e.stderr || e.message}`); }
@@ -193,12 +248,13 @@ function initRepo(cfg, a) {
 // ---- main -----------------------------------------------------------------
 function main() {
   const a = parseArgs(process.argv.slice(2));
-  const USAGE = "usage: publish-landing.mjs --slug <slug> [--locale vi] [--page-dir <path>] [--dry-run] [--json]\n       publish-landing.mjs --init   (one-time: scaffold + push the publish repo)";
+  const USAGE = "usage: publish-landing.mjs --slug <slug> [--locale vi] [--market VN] [--page-dir <path>] [--preflight] [--dry-run] [--json]\n       publish-landing.mjs --init   (one-time: scaffold + push the publish repo)";
   if (a.help) die(0, USAGE);
   const cfg = loadConfig();
   if (a.init) { initRepo(cfg, a); return; }
   if (!a.slug) die(2, USAGE);
   const locale = (a.locale || cfg.defaultLocale).toLowerCase();
+  const market = (a.market || cfg.market).toUpperCase(); // per-page market (e.g. a th page gates against TH claims)
   const slug = a.slug;
   const pageDir = a.pageDir ? path.resolve(a.pageDir) : path.join(ROOT, "assets/landing", slug);
   const liveUrl = `https://${cfg.subdomain}/${locale}/${slug}/`;
@@ -210,14 +266,39 @@ function main() {
   if (!fs.existsSync(copyFile)) die(2, `no copy.md at ${pageDir} — the claims gate needs the tagged copy. Re-run the build.`);
 
   // (1) GATE — the primary enforcement. Nothing leaves the kit if claims aren't approved.
-  const gate = runGate(copyFile, cfg.market);
+  const gate = runGate(copyFile, market);
+
+  // (preflight) — gate + remote access reported TOGETHER, zero side effects. The skill runs this
+  // before the human is asked to confirm, so "đăng đi là lên mạng ngay" is only ever promised when true.
+  if (a.preflight) {
+    const remote = checkRemoteAccess(cfg.remote);
+    const ok = gate.passed && remote.ok;
+    const result = {
+      ok, preflight: true, slug, locale, market,
+      gatePassed: gate.passed, remoteAccess: remote.ok,
+      targetPath: `${locale}/${slug}/`, liveUrl,
+      ...(gate.passed ? {} : { gateOutput: gate.output }),
+      ...(remote.ok ? {} : { remoteDetail: remote.detail }),
+    };
+    if (a.json) console.log(JSON.stringify(result, null, 2));
+    else if (ok) console.log(`✓ PREFLIGHT ok — claims gate passed + publish repo reachable.\n  ready to publish to: ${liveUrl}`);
+    else {
+      const why = [
+        gate.passed ? null : `claims gate FAILED:\n${gate.output}`,
+        remote.ok ? null : `publish repo not accessible from this machine (${cfg.remote}):\n${remote.detail}`,
+      ].filter(Boolean).join("\n\n");
+      console.log(`✗ PREFLIGHT failed — not ready to publish.\n${why}`);
+    }
+    process.exit(ok ? 0 : 1);
+  }
+
   if (!gate.passed) {
     console.error("✗ Claims gate FAILED — not published. Approve the claims below in context/claims.md, then retry.\n");
     console.error(gate.output);
     process.exit(1);
   }
   const meta = {
-    slug, locale, market: cfg.market,
+    slug, locale, market,
     subdomain: cfg.subdomain, url: liveUrl,
     builtAt: new Date().toISOString(),
     gate: { passed: true, mode: "publish", tool: "claims-check.sh" },
@@ -243,6 +324,7 @@ function main() {
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Check Phase-0 setup + push access.\n${e.stderr || e.message}`); }
   }
   ensureGitConfig(co);
+  ensureOrigin(co, cfg.remote);
   try { git(co, "fetch", "--prune", "origin"); }
   catch (e) { die(1, `git fetch failed in ${co}\n${e.stderr || e.message}`); }
 
@@ -256,7 +338,7 @@ function main() {
   try {
     if (seeded.length) git(co, "add", "-A");
     else git(co, "add", "--", `${locale}/${slug}`);
-    git(co, "commit", "-m", `publish: ${locale}/${slug}`);
+    git(co, ...commitIdFlags(co), "commit", "-m", `publish: ${locale}/${slug}`);
   } catch (e) {
     die(1, `nothing to commit — this exact page is already published (no changes to deploy).\n${e.stderr || e.message}`);
   }
