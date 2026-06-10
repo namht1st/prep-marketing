@@ -27,6 +27,7 @@ let root; // fixture kit root (PREP_KIT_ROOT) — remote is an invalid URL (neve
 let emptyRoot; // fixture with no config at all
 let liveRoot; // fixture whose remote is a LOCAL bare repo — exercises the real publish path
 let bareRemote; // the local bare "publish repo" liveRoot pushes to
+let bareRemote2; // a second bare repo — stands in for "the publish repo moved" (org rename etc.)
 
 function runEngine(args, kitRoot = root, extraEnv = {}) {
   return spawnSync(process.execPath, [ENGINE, ...args], {
@@ -95,6 +96,7 @@ after(() => {
   fs.rmSync(emptyRoot, { recursive: true, force: true });
   fs.rmSync(liveRoot, { recursive: true, force: true });
   fs.rmSync(bareRemote, { recursive: true, force: true });
+  if (bareRemote2) fs.rmSync(bareRemote2, { recursive: true, force: true });
 });
 
 // ---- usage / config validation (exit 2) ------------------------------------
@@ -291,4 +293,28 @@ test("publish: pulls the repo if absent, creates <locale>/<slug>/, commits to ma
   // provenance carries the page's market (not blindly the primary market)
   const metaRaw = spawnSync("git", ["show", "main:vi/demo-pass/publish-meta.json"], { cwd: bareRemote, encoding: "utf8" }).stdout;
   assert.equal(JSON.parse(metaRaw).market, "VN");
+});
+
+test("publish repo moved (config remote changed) → stale cache re-pointed, push lands in the NEW repo", () => {
+  // Real case: the org move left machines with a cache cloned from the old remote. The engine must
+  // follow context/marketing.config.json, never wherever the cache happened to be cloned from.
+  bareRemote2 = fs.mkdtempSync(path.join(os.tmpdir(), "publish-engine-remote2-"));
+  const init = spawnSync("git", ["init", "--bare", "-b", "main", bareRemote2], { encoding: "utf8" });
+  assert.equal(init.status, 0, init.stderr);
+
+  const cfgPath = path.join(liveRoot, "context/marketing.config.json");
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  cfg.publish.repo.remote = bareRemote2; // "the repo moved"
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+
+  const r = runEngine(["--slug", "demo-pass", "--json"], liveRoot); // cache still points at bareRemote
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+
+  const tree = spawnSync("git", ["ls-tree", "-r", "--name-only", "main"], { cwd: bareRemote2, encoding: "utf8" });
+  assert.ok(tree.stdout.split("\n").includes("vi/demo-pass/index.html"), "page must land in the NEW repo");
+  const origin = spawnSync(
+    "git", ["-C", path.join(liveRoot, ".prepkit/.publish-cache/landing"), "remote", "get-url", "origin"],
+    { encoding: "utf8" }
+  ).stdout.trim();
+  assert.equal(origin, bareRemote2, "cache origin must follow the config remote");
 });
