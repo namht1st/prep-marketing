@@ -179,6 +179,54 @@ function applySessionStatePruneAdvisory({ emit, kitRoot, kitState }) {
   return { advised: true, stateChanged: false };
 }
 
+// L4 — beyond this window a lock is considered stale (crashed or long-gone session).
+const CONCURRENT_SESSION_WINDOW_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * L4 — concurrent-session advisory. Every session start writes a single shared
+ * lock file under session-state/; finding a DIFFERENT session id with a fresh
+ * mtime means two live sessions share this worktree (and its git index).
+ * Warning-only by design — concurrent sessions are a legitimate workflow here;
+ * the risk being surfaced is an unscoped `git add`/commit sweeping the other
+ * session's staged work (2026-06-08 incident). Side effects are confined to
+ * the lock file + emit(). Exported for direct testing.
+ *
+ * @param {object} options
+ * @param {(line: string) => void} options.emit
+ * @param {string} options.kitRoot
+ * @param {string} options.sessionId
+ * @param {string} options.source
+ * @param {number} [options.now]
+ * @returns {{ warned: boolean, lockWritten: boolean }}
+ */
+function applyConcurrentSessionWarning({ emit, kitRoot, sessionId, source, now = Date.now() }) {
+  const result = { warned: false, lockWritten: false };
+  if (!sessionId) return result; // nothing to correlate against
+  if (!["startup", "resume", "clear", "compact"].includes(source || "startup")) return result;
+  const lockPath = path.join(kitRoot, ".prepkit", "session-state", "active-session.lock.json");
+  try {
+    if (fs.existsSync(lockPath)) {
+      const ageMs = now - fs.statSync(lockPath).mtimeMs;
+      let lock = null;
+      try { lock = JSON.parse(fs.readFileSync(lockPath, "utf8")); } catch { /* corrupt — treat as stale */ }
+      // ageMs may be marginally negative: mtimeMs has sub-ms precision and can land
+      // microseconds past Date.now() right after a write (same gotcha as the snapshot
+      // generatedAt bump in main()). Tolerate 1s of forward skew.
+      if (lock && lock.sessionId && lock.sessionId !== sessionId && ageMs >= -1000 && ageMs < CONCURRENT_SESSION_WINDOW_MS) {
+        const ageMin = Math.max(1, Math.round(ageMs / 60000));
+        emit(`PrepKit: another session was active here ~${ageMin}m ago — shared git index: scope every commit with an explicit pathspec and verify staged files with --cached first.`);
+        result.warned = true;
+      }
+    }
+  } catch { /* best-effort — never block session start */ }
+  try {
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.writeFileSync(lockPath, `${JSON.stringify({ sessionId, updatedAt: new Date(now).toISOString() })}\n`);
+    result.lockWritten = true;
+  } catch { /* best-effort */ }
+  return result;
+}
+
 function fileSignature(filePath) {
   try {
     const stats = fs.statSync(filePath);
@@ -705,11 +753,32 @@ function main() {
         try { writeKitState(kitRoot, bannerKitState); } catch { /* best-effort */ }
         try { postBannerKitStateMtimeMs = fs.statSync(kitStatePath(kitRoot)).mtimeMs; } catch { /* best-effort */ }
       }
-      // L3 — session-state retention advisory. Read-only with respect to
-      // kit-state; the pruner script owns the lastSessionStatePrune write.
+      // L3 — session-state retention. When the 7-day debounce says a prune is
+      // due, RUN the pruner (startup only — cheap, and the pruner's own
+      // lastSessionStatePrune write keeps this rare) instead of only advising.
+      // Falls back to the advisory line if the pruner fails or mid-session.
       try {
-        applySessionStatePruneAdvisory({ emit, kitRoot, kitState: bannerKitState });
+        const pruneCheck = applySessionStatePruneAdvisory({ emit: () => {}, kitRoot, kitState: bannerKitState });
+        if (pruneCheck.advised) {
+          let pruned = false;
+          if (source === "startup") {
+            try {
+              execFileSync(process.execPath, [path.join(kitRoot, ".prepkit", "scripts", "prune-session-state.mjs")], {
+                stdio: "pipe",
+                timeout: 15000
+              });
+              emit("PrepKit: session-state retention pruned (auto).");
+              pruned = true;
+            } catch { /* fall through to the advisory */ }
+          }
+          if (!pruned) emit("PrepKit: session-state pruning suggested — run /prep-doctor");
+        }
       } catch { /* best-effort */ }
+    } catch { /* best-effort — never block session start */ }
+
+    // L4 — concurrent-session advisory (shared worktree/git index). Warning-only.
+    try {
+      applyConcurrentSessionWarning({ emit, kitRoot, sessionId, source });
     } catch { /* best-effort — never block session start */ }
 
     if (!snapshot) {
@@ -1235,6 +1304,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  applyConcurrentSessionWarning,
   applyPackBannerFlow,
   applySessionStatePruneAdvisory,
   emitHiddenPackDigest
