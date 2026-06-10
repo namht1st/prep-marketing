@@ -208,6 +208,17 @@ function ensureGitConfig(co) {
   } catch {}
 }
 
+// The cached checkout outlives config changes (real case: the namht1st → prepforeverything org
+// move). Re-point origin whenever it drifts so pages always push to the CURRENT publish repo —
+// never wherever a stale cache happened to be cloned from.
+function ensureOrigin(co, remote) {
+  try {
+    if (git(co, "remote", "get-url", "origin") !== remote) git(co, "remote", "set-url", "origin", remote);
+  } catch {
+    try { git(co, "remote", "add", "origin", remote); } catch { /* sync will fail loudly */ }
+  }
+}
+
 // ---- init (one-time: scaffold + push the publish repo) --------------------
 function initRepo(cfg, a) {
   const co = cfg.checkout;
@@ -217,6 +228,7 @@ function initRepo(cfg, a) {
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Create it on GitHub + check push access.\n${e.stderr || e.message}`); }
   }
   ensureGitConfig(co);
+  ensureOrigin(co, cfg.remote);
   try { git(co, "fetch", "--prune", "origin"); } catch {}
   try { git(co, "checkout", "-B", cfg.productionBranch, `origin/${cfg.productionBranch}`); }
   catch { git(co, "checkout", "-B", cfg.productionBranch); }
@@ -310,6 +322,7 @@ function main() {
     catch (e) { die(1, `could not clone publish repo (${cfg.remote}). Check Phase-0 setup + push access.\n${e.stderr || e.message}`); }
   }
   ensureGitConfig(co);
+  ensureOrigin(co, cfg.remote);
   try { git(co, "fetch", "--prune", "origin"); }
   catch (e) { die(1, `git fetch failed in ${co}\n${e.stderr || e.message}`); }
 
