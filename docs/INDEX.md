@@ -38,6 +38,7 @@ How-to content, operating procedures, and working conventions.
 - `mcp-semantic-memory.md`
 - `pack-composition.md`
 - `session-state-retention.md`
+- `sop-teammate-publishing.md`
 
 ## Reference
 

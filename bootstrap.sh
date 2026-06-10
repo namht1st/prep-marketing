@@ -2,7 +2,7 @@
 #
 # PrepEdu Marketing Kit — one-command bootstrap (from a blank machine).
 #
-#   curl -fsSL https://raw.githubusercontent.com/namht1st/prep-marketing/main/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/prepforeverything/prep-marketing/main/bootstrap.sh | bash
 #
 # Installs everything a fresh Mac/Linux machine needs — Claude Code, Node.js, and the
 # kit itself — without you installing anything first. No admin password on the common
@@ -16,7 +16,7 @@
 
 set -u
 
-REPO_SLUG="namht1st/prep-marketing"
+REPO_SLUG="prepforeverything/prep-marketing"
 REPO_BRANCH="${PREP_BRANCH:-main}"
 INSTALL_DIR="${PREP_DIR:-$HOME/prep-marketing}"
 NODE_VERSION="${NODE_VERSION:-v22.11.0}"   # LTS; override with NODE_VERSION=v20.x if needed
